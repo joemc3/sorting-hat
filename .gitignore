@@ -29,6 +29,19 @@ out/
 # Coverage
 coverage/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+
+# Worktrees
+.worktrees/
+
 # Misc
 *.tgz
 *.tar.gz
