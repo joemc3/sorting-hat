@@ -1,0 +1,19 @@
+services:
+  api:
+    image: ghcr.io/joemc3/sorting-hat-api:latest
+    ports: !reset []
+    networks:
+      - app_network
+      - supabase_network
+
+  web:
+    image: ghcr.io/joemc3/sorting-hat-web:latest
+    ports: !reset []
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`2524.info`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=3000"
+    networks:
+      - app_network

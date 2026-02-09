@@ -7,9 +7,24 @@ An open, architectural taxonomy for classifying enterprise software and compute-
 The Sorting Hat is a product for classifying enterprise IT products into a structured taxonomy. It consists of:
 
 1. **A taxonomy** — ~220+ nodes across 10 governance groups with natural-language definitions at every node
-2. **A taxonomy management API** — for maintaining and managing the taxonomy
-3. **A classification API** — accepts a product URL, uses AI to read the page, and classifies the product into the correct taxonomy node(s)
-4. **A single front end** — serves both taxonomy management and classification workflows
+2. **A taxonomy management API** — full CRUD for governance groups and taxonomy nodes, search, subtree queries
+3. **A classification API** — accepts a product URL, scrapes the page, and uses an LLM to classify the product into the correct taxonomy node(s)
+4. **A single front end** — taxonomy browser with tree visualization and a classification interface for submitting URLs
+
+## How Classification Works
+
+The classification API runs a 3-step AI pipeline:
+
+1. **Scrape** — Fetches the product URL and extracts clean text content from the page
+2. **Summarize** — An LLM reads the extracted content and produces a structured product summary: name, primary function, key capabilities, target users, and category signals
+3. **Classify** — A second LLM call receives the product summary alongside the full taxonomy (with definitions at every node) and returns a JSON classification: one primary category, up to two secondaries, confidence score, and reasoning
+
+Each step is logged with its input, output, model used, token count, and latency — making the classification pipeline fully auditable.
+
+The LLM provider is pluggable via an OpenAI-compatible abstraction. Supported backends:
+- **OpenRouter** (default) — access to Claude, GPT-4, and other models
+- **OpenAI** — direct OpenAI API
+- **Ollama** — local models for development and testing
 
 ## Taxonomy Design Principles
 
@@ -36,6 +51,90 @@ The Sorting Hat is a product for classifying enterprise IT products into a struc
 | 8 | IT Operations & Infrastructure | Yes | Yes | ITSM, monitoring, backup, virtualization, servers, storage |
 | 9 | Engineering & Design | Yes | — | CAD, CAM, CAE, PLM, UX design, media production, GIS |
 | 10 | Networking | Yes | Yes | SDN, network monitoring, SD-WAN, switches, routers, wireless |
+
+## Architecture
+
+```
+Internet → Traefik (:443) → Next.js → FastAPI → PostgreSQL
+                                    ↘ LLM Provider (OpenRouter / OpenAI / Ollama)
+```
+
+- **API** — FastAPI (Python 3.12) with SQLAlchemy async, Alembic migrations, pluggable LLM provider
+- **Web** — Next.js 16 (App Router, TypeScript, Tailwind CSS, shadcn/ui)
+- **Database** — PostgreSQL 15 with `ltree` extension for tree-structured taxonomy paths
+- **Proxy** — Traefik v3 with auto-provisioned Let's Encrypt SSL (VPS only)
+
+### API Endpoints
+
+**Taxonomy Management** (`/api/v1/taxonomy`)
+- `GET /governance-groups` — List all governance groups
+- `POST /governance-groups` — Create a governance group
+- `GET/PUT/DELETE /governance-groups/{slug}` — CRUD by slug
+- `GET /nodes` — List taxonomy nodes (filter by branch, governance group, depth)
+- `GET /nodes/search?q=` — Full-text search across node names and definitions
+- `GET /nodes/{id}` — Node detail with children and parent chain
+- `GET /nodes/{id}/subtree` — Full subtree under a node
+- `POST/PUT/DELETE /nodes` — CRUD for taxonomy nodes
+
+**Classification** (`/api/v1/classify`)
+- `POST /classify` — Submit a URL for AI classification (returns primary + secondary nodes, confidence, reasoning)
+- `GET /classify/{id}` — Full classification detail including all pipeline steps
+- `GET /classify` — List past classifications (filter by URL)
+
+## Quick Start (Docker)
+
+```bash
+# Clone and configure
+git clone https://github.com/joemc3/sorting-hat.git
+cd sorting-hat
+cp .env.example .env
+# Edit .env — set POSTGRES_PASSWORD and SORTING_HAT_LLM_API_KEY
+
+# Start everything
+docker compose up -d
+
+# Access
+# Web:    http://localhost:3000
+# API:    http://localhost:8000
+# Health: http://localhost:8000/health
+```
+
+## Local Development (without Docker)
+
+```bash
+# API
+cd api
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env  # Edit with your database URL and LLM API key
+uvicorn sorting_hat.main:app --reload
+
+# Web (separate terminal)
+cd web
+npm install
+npm run dev
+```
+
+Requires a PostgreSQL instance with the `ltree` extension — see `api/.env.example` for connection config.
+
+## Running Tests
+
+```bash
+# API tests
+cd api && source .venv/bin/activate
+pytest tests/ -q
+ruff check .
+
+# Web lint
+cd web
+npm run lint
+```
+
+## Deployment
+
+See [docs/vps-setup.md](docs/vps-setup.md) for full VPS deployment instructions.
+
+CI/CD via GitHub Actions: push to `main` builds Docker images, pushes to ghcr.io, and deploys to the VPS.
 
 ## License
 
