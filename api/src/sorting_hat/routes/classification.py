@@ -10,7 +10,6 @@ from sorting_hat.models.classification import Classification
 from sorting_hat.schemas.classification import (
     ClassificationDetail,
     ClassificationResponse,
-    ClassificationStepResponse,
     ClassifyRequest,
 )
 from sorting_hat.services.classifier import ClassifierService, ClassificationError

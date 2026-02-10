@@ -8,7 +8,6 @@ from sorting_hat.schemas.taxonomy import (
     GovernanceGroupUpdate,
     TaxonomyNodeCreate,
     TaxonomyNodeDetail,
-    TaxonomyNodeMove,
     TaxonomyNodeResponse,
     TaxonomyNodeUpdate,
 )

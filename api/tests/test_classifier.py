@@ -1,6 +1,6 @@
 import json
 
-from sorting_hat.services.classifier import ClassifierService, ClassificationError
+from sorting_hat.services.classifier import ClassifierService
 from sorting_hat.prompts import SUMMARIZE_SYSTEM, CLASSIFY_SYSTEM
 from sorting_hat.prompts.summarize import SUMMARIZE_USER
 from sorting_hat.prompts.classify import CLASSIFY_USER

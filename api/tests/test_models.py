@@ -1,6 +1,5 @@
 def test_models_import():
     from sorting_hat.models import (
-        Base,
         Branch,
         GovernanceGroup,
         TaxonomyNode,

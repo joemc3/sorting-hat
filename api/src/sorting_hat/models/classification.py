@@ -4,9 +4,14 @@ from uuid import uuid4
 
 from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from typing import TYPE_CHECKING
+
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sorting_hat.models.taxonomy import Base
+
+if TYPE_CHECKING:
+    from sorting_hat.models.taxonomy import TaxonomyNode  # noqa: F811
 
 
 class StepType(str, enum.Enum):
