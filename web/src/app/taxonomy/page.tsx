@@ -16,12 +16,25 @@ export default function TaxonomyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setLoading(true);
+    let cancelled = false;
     const fetchNodes = search
       ? api.taxonomy.searchNodes(search)
       : api.taxonomy.listNodes({ branch });
-    fetchNodes.then(setNodes).finally(() => setLoading(false));
+    fetchNodes
+      .then((data) => { if (!cancelled) setNodes(data); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [branch, search]);
+
+  const handleBranchChange = (value: string) => {
+    setLoading(true);
+    setBranch(value);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setLoading(true);
+    setSearch(value);
+  };
 
   const handleSelect = async (node: TaxonomyNode) => {
     const detail = await api.taxonomy.getNode(node.id);
@@ -35,9 +48,9 @@ export default function TaxonomyPage() {
         <Input
           placeholder="Search nodes..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
-        <Tabs value={branch} onValueChange={setBranch}>
+        <Tabs value={branch} onValueChange={handleBranchChange}>
           <TabsList className="w-full">
             <TabsTrigger value="software" className="flex-1">Software</TabsTrigger>
             <TabsTrigger value="hardware" className="flex-1">Hardware</TabsTrigger>
