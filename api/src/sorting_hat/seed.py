@@ -3,8 +3,14 @@
 Usage: python -m sorting_hat.seed > supabase/migrations/002_seed_taxonomy.sql
 """
 
+import os
 import re
 from uuid import uuid5, NAMESPACE_DNS
+
+DEFAULT_RESEARCH_DOC = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "research", "Taxonomy Definitions - Complete Reference.md",
+)
 
 
 # Deterministic UUIDs so seeds are idempotent
@@ -19,6 +25,27 @@ def slugify(text: str) -> str:
 def escape_sql(text: str) -> str:
     return text.replace("'", "''")
 
+
+GROUP_NUMBER_TO_SLUG: dict[int, str] = {
+    1: "application-development-platform",
+    2: "business-operations",
+    3: "customer-revenue-technology",
+    4: "data-analytics",
+    5: "collaboration-communication",
+    6: "end-user-computing",
+    7: "security",
+    8: "it-operations-infrastructure",
+    9: "engineering-design",
+    10: "networking",
+}
+
+DUAL_BRANCH_GROUPS: set[str] = {
+    "collaboration-communication",
+    "end-user-computing",
+    "security",
+    "it-operations-infrastructure",
+    "networking",
+}
 
 GOVERNANCE_GROUPS = [
     {
@@ -104,6 +131,169 @@ GOVERNANCE_GROUPS = [
 ]
 
 
+def parse_definition_fields(text: str) -> dict[str, str]:
+    """Extract definition, distinguishing_characteristics, inclusions, exclusions from text."""
+    result = {
+        "definition": "",
+        "distinguishing_characteristics": "",
+        "inclusions": "",
+        "exclusions": "",
+    }
+
+    # Split on known field markers
+    markers = [
+        ("distinguishing_characteristics", r"\*Distinguishing characteristics:\*"),
+        ("inclusions", r"\*Includes:\*"),
+        ("exclusions", r"\*Does not include:\*"),
+    ]
+
+    remaining = text.strip()
+
+    # Find positions of all markers
+    splits: list[tuple[int, str, int]] = []
+    for field, pattern in markers:
+        m = re.search(pattern, remaining)
+        if m:
+            splits.append((m.start(), field, m.end()))
+
+    if not splits:
+        result["definition"] = remaining
+        return result
+
+    # Sort by position
+    splits.sort(key=lambda x: x[0])
+
+    # Everything before first marker is the definition
+    result["definition"] = remaining[: splits[0][0]].strip()
+
+    # Extract each field
+    for i, (_, field, end) in enumerate(splits):
+        if i + 1 < len(splits):
+            value = remaining[end : splits[i + 1][0]].strip()
+        else:
+            value = remaining[end:].strip()
+        result[field] = value
+
+    return result
+
+
+def parse_taxonomy_definitions(filepath: str | None = None) -> list[dict]:
+    """Parse the taxonomy definitions markdown document and return a list of node dicts.
+
+    Each node dict contains: name, slug, branch, level, governance_group_slug,
+    parent_path, path, definition, distinguishing_characteristics, inclusions,
+    exclusions, sort_order.
+    """
+    if filepath is None:
+        filepath = DEFAULT_RESEARCH_DOC
+
+    with open(filepath) as f:
+        content = f.read()
+
+    nodes: list[dict] = []
+    current_branch: str | None = None
+    current_group_slug: str | None = None
+    current_l2_path: str | None = None
+    current_l3_path: str | None = None
+    sort_counter = 0
+    first_bold_after_heading = False
+
+    for line in content.split("\n"):
+        stripped = line.strip()
+
+        # Branch headers
+        if stripped == "## SOFTWARE":
+            current_branch = "software"
+            continue
+        if stripped == "## COMPUTING HARDWARE":
+            current_branch = "hardware"
+            continue
+
+        # Skip non-taxonomy lines before first branch
+        if current_branch is None:
+            continue
+
+        # Governance group heading: ### N. Group Name or ### N. Group Name (Software/Hardware)
+        group_match = re.match(r"^### (\d+)\.\s+(.+)$", stripped)
+        if group_match:
+            group_number = int(group_match.group(1))
+            current_group_slug = GROUP_NUMBER_TO_SLUG[group_number]
+            first_bold_after_heading = True
+            current_l3_path = None
+            continue
+
+        # Skip if no group context yet
+        if current_group_slug is None:
+            continue
+
+        # Level-4 subcategory: - **Name** — definition text
+        l4_match = re.match(r"^- \*\*(.+?)\*\*\s*—\s*(.+)$", stripped)
+        if l4_match and current_l3_path is not None:
+            name = l4_match.group(1).strip()
+            def_text = l4_match.group(2).strip()
+            node_slug = slugify(name)
+            path = f"{current_l3_path}.{node_slug}"
+            fields = parse_definition_fields(def_text)
+            sort_counter += 1
+            nodes.append({
+                "name": name,
+                "slug": node_slug,
+                "branch": current_branch,
+                "level": 4,
+                "governance_group_slug": current_group_slug,
+                "parent_path": current_l3_path,
+                "path": path,
+                "sort_order": sort_counter,
+                **fields,
+            })
+            continue
+
+        # Level-2 (first bold after ###) or Level-3 (subsequent bold): **Name** — def
+        l23_match = re.match(r"^\*\*(.+?)\*\*\s*—\s*(.+)$", stripped)
+        if l23_match:
+            name = l23_match.group(1).strip()
+            def_text = l23_match.group(2).strip()
+            node_slug = slugify(name)
+            fields = parse_definition_fields(def_text)
+            sort_counter += 1
+
+            if first_bold_after_heading:
+                # Level-2 node
+                first_bold_after_heading = False
+                branch_prefix = current_branch
+                path = f"{branch_prefix}.{slugify(current_group_slug.replace('-', '_'))}"
+                current_l2_path = path
+                current_l3_path = None
+                nodes.append({
+                    "name": name,
+                    "slug": node_slug,
+                    "branch": current_branch,
+                    "level": 2,
+                    "governance_group_slug": current_group_slug,
+                    "parent_path": None,
+                    "path": path,
+                    "sort_order": sort_counter,
+                    **fields,
+                })
+            else:
+                # Level-3 category
+                path = f"{current_l2_path}.{node_slug}"
+                current_l3_path = path
+                nodes.append({
+                    "name": name,
+                    "slug": node_slug,
+                    "branch": current_branch,
+                    "level": 3,
+                    "governance_group_slug": current_group_slug,
+                    "parent_path": current_l2_path,
+                    "path": path,
+                    "sort_order": sort_counter,
+                    **fields,
+                })
+
+    return nodes
+
+
 def generate_governance_groups_sql() -> list[str]:
     statements = []
     for g in GOVERNANCE_GROUPS:
@@ -114,6 +304,34 @@ def generate_governance_groups_sql() -> list[str]:
             f"'{escape_sql(g['description'])}', {str(g['covers_software']).upper()}, "
             f"{str(g['covers_hardware']).upper()}, {g['sort_order']});"
         )
+    return statements
+
+
+def generate_taxonomy_nodes_sql() -> list[str]:
+    """Generate INSERT statements for all taxonomy nodes, ordered by level then path."""
+    nodes = parse_taxonomy_definitions()
+    # Sort by level (parents before children) then path for determinism
+    nodes.sort(key=lambda n: (n["level"], n["path"]))
+
+    statements = []
+    for n in nodes:
+        node_id = make_id(n["path"])
+        gov_group_id = make_id(n["governance_group_slug"])
+        parent_id = f"'{make_id(n['parent_path'])}'" if n["parent_path"] else "NULL"
+
+        stmt = (
+            f"INSERT INTO taxonomy_nodes "
+            f"(id, governance_group_id, parent_id, path, name, slug, level, branch, "
+            f"definition, distinguishing_characteristics, inclusions, exclusions, sort_order) "
+            f"VALUES ('{node_id}', '{gov_group_id}', {parent_id}, "
+            f"'{escape_sql(n['path'])}', '{escape_sql(n['name'])}', '{escape_sql(n['slug'])}', "
+            f"{n['level']}, '{n['branch']}', "
+            f"'{escape_sql(n['definition'])}', '{escape_sql(n['distinguishing_characteristics'])}', "
+            f"'{escape_sql(n['inclusions'])}', '{escape_sql(n['exclusions'])}', "
+            f"{n['sort_order']});"
+        )
+        statements.append(stmt)
+
     return statements
 
 
