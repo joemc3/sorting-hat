@@ -125,6 +125,52 @@ GOVERNANCE_GROUPS = [
 ]
 
 
+def parse_definition_fields(text: str) -> dict[str, str]:
+    """Extract definition, distinguishing_characteristics, inclusions, exclusions from text."""
+    result = {
+        "definition": "",
+        "distinguishing_characteristics": "",
+        "inclusions": "",
+        "exclusions": "",
+    }
+
+    # Split on known field markers
+    markers = [
+        ("distinguishing_characteristics", r"\*Distinguishing characteristics:\*"),
+        ("inclusions", r"\*Includes:\*"),
+        ("exclusions", r"\*Does not include:\*"),
+    ]
+
+    remaining = text.strip()
+
+    # Find positions of all markers
+    splits: list[tuple[int, str, int]] = []
+    for field, pattern in markers:
+        m = re.search(pattern, remaining)
+        if m:
+            splits.append((m.start(), field, m.end()))
+
+    if not splits:
+        result["definition"] = remaining
+        return result
+
+    # Sort by position
+    splits.sort(key=lambda x: x[0])
+
+    # Everything before first marker is the definition
+    result["definition"] = remaining[: splits[0][0]].strip()
+
+    # Extract each field
+    for i, (_, field, end) in enumerate(splits):
+        if i + 1 < len(splits):
+            value = remaining[end : splits[i + 1][0]].strip()
+        else:
+            value = remaining[end:].strip()
+        result[field] = value
+
+    return result
+
+
 def generate_governance_groups_sql() -> list[str]:
     statements = []
     for g in GOVERNANCE_GROUPS:
