@@ -38,12 +38,12 @@ export function ClassificationResult({ result }: ClassificationResultProps) {
           )}
         </div>
 
-        {result.secondary_node_ids.length > 0 && (
+        {result.secondary_node_paths.length > 0 && (
           <div>
             <h4 className="font-medium text-sm mb-2">Secondary Classifications</h4>
-            <div className="flex gap-1">
-              {result.secondary_node_ids.map((id) => (
-                <Badge key={id} variant="outline">{id}</Badge>
+            <div className="flex gap-1 flex-wrap">
+              {result.secondary_node_paths.map((path) => (
+                <Badge key={path} variant="outline">{path}</Badge>
               ))}
             </div>
           </div>
