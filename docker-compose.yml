@@ -17,11 +17,15 @@ services:
     restart: unless-stopped
 
   web:
-    build: ./web
+    build:
+      context: ./web
+      args:
+        API_URL: http://api:8000
     ports:
       - "${SORTING_HAT_WEB_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:${SORTING_HAT_API_PORT:-8000}/api/v1
+      - API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=/api/v1
     depends_on:
       - api
     networks:
