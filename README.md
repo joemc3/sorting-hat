@@ -6,7 +6,7 @@ An open, architectural taxonomy for classifying enterprise software and compute-
 
 The Sorting Hat is a product for classifying enterprise IT products into a structured taxonomy. It consists of:
 
-1. **A taxonomy** — ~220+ nodes across 10 governance groups with natural-language definitions at every node
+1. **A taxonomy** — 278 nodes across 10 governance groups with natural-language definitions at every node
 2. **A taxonomy management API** — full CRUD for governance groups and taxonomy nodes, search, subtree queries
 3. **A classification API** — accepts a product URL, scrapes the page, and uses an LLM to classify the product into the correct taxonomy node(s)
 4. **A single front end** — taxonomy browser with tree visualization and a classification interface for submitting URLs
@@ -55,14 +55,18 @@ The LLM provider is pluggable via an OpenAI-compatible abstraction. Supported ba
 ## Architecture
 
 ```
-Internet → Traefik (:443) → Next.js → FastAPI → PostgreSQL
-                                    ↘ LLM Provider (OpenRouter / OpenAI / Ollama)
+                          ┌→ Next.js (web)
+Internet → Traefik (:443) ┤
+                          └→ FastAPI (api) → PostgreSQL
+                                           → LLM Provider (OpenRouter / OpenAI / Ollama)
 ```
+
+Traefik routes by path: requests to `/api/` go directly to FastAPI, everything else goes to Next.js.
 
 - **API** — FastAPI (Python 3.12) with SQLAlchemy async, Alembic migrations, pluggable LLM provider
 - **Web** — Next.js 16 (App Router, TypeScript, Tailwind CSS, shadcn/ui)
 - **Database** — PostgreSQL 15 with `ltree` extension for tree-structured taxonomy paths
-- **Proxy** — Traefik v3 with auto-provisioned Let's Encrypt SSL (VPS only)
+- **Proxy** — Traefik with auto-provisioned Let's Encrypt SSL (VPS only)
 
 ### API Endpoints
 
@@ -134,7 +138,28 @@ npm run lint
 
 See [docs/vps-setup.md](docs/vps-setup.md) for full VPS deployment instructions.
 
-CI/CD via GitHub Actions: push to `main` builds Docker images, pushes to ghcr.io, and deploys to the VPS.
+CI/CD via GitHub Actions: push to `main` runs linting and tests, builds Docker images, and pushes to ghcr.io. Deployment to the VPS is manual — pull the updated images and restart services.
+
+## Codebase Statistics
+
+| Area | Files | Lines of Code |
+|------|------:|-------------:|
+| Python source (`api/src/`) | 24 | 1,656 |
+| Python tests (`api/tests/`) | 10 | 529 |
+| TypeScript/TSX (`web/src/`) | 19 | 1,163 |
+| **Total** | **53** | **3,348** |
+
+| Metric | Count |
+|--------|------:|
+| API endpoints | 16 (12 taxonomy, 3 classification, 1 health) |
+| Database models | 4 (GovernanceGroup, TaxonomyNode, Classification, ClassificationStep) |
+| Alembic migrations | 3 |
+| Seeded taxonomy nodes | 278 across 10 governance groups |
+| Test files | 10 (all Python; no frontend tests yet) |
+| Test cases | 55 |
+| Python dependencies | 16 (11 runtime + 5 dev) |
+| JavaScript dependencies | 18 (8 runtime + 10 dev) |
+| Docker services | 3 (api, web, db) |
 
 ## License
 
