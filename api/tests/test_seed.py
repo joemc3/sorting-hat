@@ -10,6 +10,7 @@ from sorting_hat.seed import (
     DUAL_BRANCH_GROUPS,
     parse_definition_fields,
     parse_taxonomy_definitions,
+    generate_taxonomy_nodes_sql,
 )
 
 import os
@@ -182,3 +183,45 @@ def test_parse_taxonomy_definitions_has_definitions():
     nodes = parse_taxonomy_definitions(RESEARCH_DOC)
     for n in nodes:
         assert n["definition"], f"Node {n['path']} has empty definition"
+
+
+# --- generate_taxonomy_nodes_sql tests ---
+
+
+def test_generate_taxonomy_nodes_sql_count():
+    stmts = generate_taxonomy_nodes_sql()
+    assert len(stmts) >= 220
+
+
+def test_generate_taxonomy_nodes_sql_all_insert():
+    stmts = generate_taxonomy_nodes_sql()
+    assert all("INSERT INTO taxonomy_nodes" in s for s in stmts)
+
+
+def test_generate_taxonomy_nodes_sql_level_ordering():
+    """Level 2 before 3 before 4 (FK constraint requires parents first)."""
+    stmts = generate_taxonomy_nodes_sql()
+    levels = []
+    for s in stmts:
+        # Extract level from SQL
+        m = re.search(r",\s*(\d+),\s*'(software|hardware)'", s)
+        if m:
+            levels.append(int(m.group(1)))
+    # Levels should be non-decreasing
+    for i in range(1, len(levels)):
+        assert levels[i] >= levels[i - 1], (
+            f"Level ordering violated at index {i}: {levels[i - 1]} > {levels[i]}"
+        )
+
+
+def test_generate_taxonomy_nodes_sql_deterministic():
+    assert generate_taxonomy_nodes_sql() == generate_taxonomy_nodes_sql()
+
+
+def test_generate_taxonomy_nodes_sql_no_unescaped_quotes():
+    stmts = generate_taxonomy_nodes_sql()
+    for s in stmts:
+        # After removing escaped quotes (''), there should be an even number of '
+        cleaned = s.replace("''", "")
+        count = cleaned.count("'")
+        assert count % 2 == 0, f"Unbalanced quotes in: {s[:100]}..."
