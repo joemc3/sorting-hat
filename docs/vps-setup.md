@@ -111,7 +111,7 @@ echo | openssl s_client -connect 2524.info:443 2>/dev/null | openssl x509 -noout
 docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 
 # Check API health
-curl https://2524.info/api/v1/health
+curl https://2524.info/api/health
 
 # Check logs
 docker compose -f docker-compose.yml -f docker-compose.prod.yml logs api

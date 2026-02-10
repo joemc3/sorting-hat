@@ -96,7 +96,7 @@ docker compose up -d
 # Access
 # Web:    http://localhost:3000
 # API:    http://localhost:8000
-# Health: http://localhost:8000/health
+# Health: http://localhost:8000/api/health
 ```
 
 ## Local Development (without Docker)

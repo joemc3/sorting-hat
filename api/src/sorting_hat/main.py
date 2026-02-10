@@ -41,6 +41,9 @@ app = FastAPI(
     ),
     lifespan=lifespan,
     openapi_tags=tags_metadata,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
 )
 
 app.add_middleware(
@@ -55,6 +58,6 @@ app.include_router(taxonomy_router, prefix=settings.api_prefix)
 app.include_router(classification_router, prefix=settings.api_prefix)
 
 
-@app.get("/health")
+@app.get("/api/health")
 async def health():
     return {"status": "ok"}
