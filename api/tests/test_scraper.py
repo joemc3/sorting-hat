@@ -1,4 +1,3 @@
-import pytest
 import trafilatura
 
 from sorting_hat.services.scraper import Scraper, ScraperError

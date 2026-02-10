@@ -4,7 +4,6 @@ Usage: python -m sorting_hat.seed > supabase/migrations/002_seed_taxonomy.sql
 """
 
 import re
-import sys
 from uuid import uuid5, NAMESPACE_DNS
 
 

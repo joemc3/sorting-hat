@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from sorting_hat.llm.provider import LLMMessage, LLMProvider
 from sorting_hat.models.classification import Classification, ClassificationStep, StepType
-from sorting_hat.models.taxonomy import TaxonomyNode
 from sorting_hat.prompts import CLASSIFY_SYSTEM, CLASSIFY_USER, SUMMARIZE_SYSTEM, SUMMARIZE_USER
 from sorting_hat.services.scraper import Scraper
 from sorting_hat.services.taxonomy import TaxonomyService

@@ -2,11 +2,12 @@ services:
   api:
     build: ./api
     ports:
-      - "8000:8000"
+      - "${SORTING_HAT_API_PORT:-8000}:8000"
     env_file:
       - .env
     environment:
       - SORTING_HAT_DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      - SORTING_HAT_CORS_ORIGINS=["http://localhost:${SORTING_HAT_WEB_PORT:-3000}"]
     depends_on:
       db:
         condition: service_healthy
@@ -18,9 +19,9 @@ services:
   web:
     build: ./web
     ports:
-      - "3000:3000"
+      - "${SORTING_HAT_WEB_PORT:-3000}:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://api:8000/api/v1
+      - NEXT_PUBLIC_API_URL=http://localhost:${SORTING_HAT_API_PORT:-8000}/api/v1
     depends_on:
       - api
     networks:
@@ -30,7 +31,7 @@ services:
   db:
     image: supabase/postgres:15.8.1.060
     ports:
-      - "54322:5432"
+      - "${SORTING_HAT_DB_PORT:-54322}:5432"
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: postgres

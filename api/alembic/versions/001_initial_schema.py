@@ -20,11 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS ltree")
 
-    branch_enum = sa.Enum("software", "hardware", name="branch")
-    branch_enum.create(op.get_bind(), checkfirst=True)
-
-    step_type_enum = sa.Enum("scrape", "summarize", "classify", name="step_type")
-    step_type_enum.create(op.get_bind(), checkfirst=True)
+    op.execute("DO $$ BEGIN CREATE TYPE branch AS ENUM ('software', 'hardware'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
+    op.execute("DO $$ BEGIN CREATE TYPE step_type AS ENUM ('scrape', 'summarize', 'classify'); EXCEPTION WHEN duplicate_object THEN NULL; END $$")
 
     op.create_table(
         "governance_groups",
@@ -44,11 +41,11 @@ def upgrade() -> None:
         sa.Column("id", UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("governance_group_id", UUID(as_uuid=False), sa.ForeignKey("governance_groups.id"), nullable=False),
         sa.Column("parent_id", UUID(as_uuid=False), sa.ForeignKey("taxonomy_nodes.id"), nullable=True),
-        sa.Column("path", sa.String(1000), nullable=False, server_default=""),
+        sa.Column("path", sa.String(1000), nullable=False),
         sa.Column("name", sa.String(300), nullable=False),
         sa.Column("slug", sa.String(300), nullable=False),
         sa.Column("level", sa.Integer(), nullable=False),
-        sa.Column("branch", sa.Enum("software", "hardware", name="branch", create_type=False), nullable=False),
+        sa.Column("branch", sa.String(20), nullable=False),
         sa.Column("definition", sa.Text(), nullable=False, server_default=""),
         sa.Column("distinguishing_characteristics", sa.Text(), nullable=False, server_default=""),
         sa.Column("inclusions", sa.Text(), nullable=False, server_default=""),
@@ -89,7 +86,7 @@ def upgrade() -> None:
         "classification_steps",
         sa.Column("id", UUID(as_uuid=False), primary_key=True, server_default=sa.text("gen_random_uuid()")),
         sa.Column("classification_id", UUID(as_uuid=False), sa.ForeignKey("classifications.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("step_type", sa.Enum("scrape", "summarize", "classify", name="step_type", create_type=False), nullable=False),
+        sa.Column("step_type", sa.String(20), nullable=False),
         sa.Column("input_text", sa.Text(), nullable=False, server_default=""),
         sa.Column("output_text", sa.Text(), nullable=False, server_default=""),
         sa.Column("model_used", sa.String(200), nullable=False, server_default=""),
@@ -99,6 +96,10 @@ def upgrade() -> None:
     )
 
     op.create_index("idx_classification_steps_classification", "classification_steps", ["classification_id"])
+
+    # Cast placeholder columns to their enum types
+    op.execute("ALTER TABLE taxonomy_nodes ALTER COLUMN branch TYPE branch USING branch::branch")
+    op.execute("ALTER TABLE classification_steps ALTER COLUMN step_type TYPE step_type USING step_type::step_type")
 
     # Auto-update updated_at trigger
     op.execute("""
