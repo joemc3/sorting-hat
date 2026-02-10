@@ -3,8 +3,14 @@
 Usage: python -m sorting_hat.seed > supabase/migrations/002_seed_taxonomy.sql
 """
 
+import os
 import re
 from uuid import uuid5, NAMESPACE_DNS
+
+DEFAULT_RESEARCH_DOC = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..", "research", "Taxonomy Definitions - Complete Reference.md",
+)
 
 
 # Deterministic UUIDs so seeds are idempotent
@@ -169,6 +175,123 @@ def parse_definition_fields(text: str) -> dict[str, str]:
         result[field] = value
 
     return result
+
+
+def parse_taxonomy_definitions(filepath: str | None = None) -> list[dict]:
+    """Parse the taxonomy definitions markdown document and return a list of node dicts.
+
+    Each node dict contains: name, slug, branch, level, governance_group_slug,
+    parent_path, path, definition, distinguishing_characteristics, inclusions,
+    exclusions, sort_order.
+    """
+    if filepath is None:
+        filepath = DEFAULT_RESEARCH_DOC
+
+    with open(filepath) as f:
+        content = f.read()
+
+    nodes: list[dict] = []
+    current_branch: str | None = None
+    current_group_slug: str | None = None
+    current_l2_path: str | None = None
+    current_l3_path: str | None = None
+    sort_counter = 0
+    first_bold_after_heading = False
+
+    for line in content.split("\n"):
+        stripped = line.strip()
+
+        # Branch headers
+        if stripped == "## SOFTWARE":
+            current_branch = "software"
+            continue
+        if stripped == "## COMPUTING HARDWARE":
+            current_branch = "hardware"
+            continue
+
+        # Skip non-taxonomy lines before first branch
+        if current_branch is None:
+            continue
+
+        # Governance group heading: ### N. Group Name or ### N. Group Name (Software/Hardware)
+        group_match = re.match(r"^### (\d+)\.\s+(.+)$", stripped)
+        if group_match:
+            group_number = int(group_match.group(1))
+            current_group_slug = GROUP_NUMBER_TO_SLUG[group_number]
+            first_bold_after_heading = True
+            current_l3_path = None
+            continue
+
+        # Skip if no group context yet
+        if current_group_slug is None:
+            continue
+
+        # Level-4 subcategory: - **Name** — definition text
+        l4_match = re.match(r"^- \*\*(.+?)\*\*\s*—\s*(.+)$", stripped)
+        if l4_match and current_l3_path is not None:
+            name = l4_match.group(1).strip()
+            def_text = l4_match.group(2).strip()
+            node_slug = slugify(name)
+            path = f"{current_l3_path}.{node_slug}"
+            fields = parse_definition_fields(def_text)
+            sort_counter += 1
+            nodes.append({
+                "name": name,
+                "slug": node_slug,
+                "branch": current_branch,
+                "level": 4,
+                "governance_group_slug": current_group_slug,
+                "parent_path": current_l3_path,
+                "path": path,
+                "sort_order": sort_counter,
+                **fields,
+            })
+            continue
+
+        # Level-2 (first bold after ###) or Level-3 (subsequent bold): **Name** — def
+        l23_match = re.match(r"^\*\*(.+?)\*\*\s*—\s*(.+)$", stripped)
+        if l23_match:
+            name = l23_match.group(1).strip()
+            def_text = l23_match.group(2).strip()
+            node_slug = slugify(name)
+            fields = parse_definition_fields(def_text)
+            sort_counter += 1
+
+            if first_bold_after_heading:
+                # Level-2 node
+                first_bold_after_heading = False
+                branch_prefix = current_branch
+                path = f"{branch_prefix}.{slugify(current_group_slug.replace('-', '_'))}"
+                current_l2_path = path
+                current_l3_path = None
+                nodes.append({
+                    "name": name,
+                    "slug": node_slug,
+                    "branch": current_branch,
+                    "level": 2,
+                    "governance_group_slug": current_group_slug,
+                    "parent_path": None,
+                    "path": path,
+                    "sort_order": sort_counter,
+                    **fields,
+                })
+            else:
+                # Level-3 category
+                path = f"{current_l2_path}.{node_slug}"
+                current_l3_path = path
+                nodes.append({
+                    "name": name,
+                    "slug": node_slug,
+                    "branch": current_branch,
+                    "level": 3,
+                    "governance_group_slug": current_group_slug,
+                    "parent_path": current_l2_path,
+                    "path": path,
+                    "sort_order": sort_counter,
+                    **fields,
+                })
+
+    return nodes
 
 
 def generate_governance_groups_sql() -> list[str]:

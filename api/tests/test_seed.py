@@ -1,3 +1,5 @@
+import re
+
 from sorting_hat.seed import (
     make_id,
     slugify,
@@ -7,6 +9,14 @@ from sorting_hat.seed import (
     GROUP_NUMBER_TO_SLUG,
     DUAL_BRANCH_GROUPS,
     parse_definition_fields,
+    parse_taxonomy_definitions,
+)
+
+import os
+
+RESEARCH_DOC = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "research", "Taxonomy Definitions - Complete Reference.md",
 )
 
 
@@ -105,3 +115,70 @@ def test_parse_definition_fields_real_example():
     assert "Focuses on the technical tools" in result["distinguishing_characteristics"]
     assert "IDEs, programming languages" in result["inclusions"]
     assert "Infrastructure management" in result["exclusions"]
+
+
+# --- parse_taxonomy_definitions tests ---
+
+
+def test_parse_taxonomy_definitions_total_count():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    assert len(nodes) >= 220
+
+
+def test_parse_taxonomy_definitions_level_2_count():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    l2 = [n for n in nodes if n["level"] == 2]
+    assert len(l2) == 15  # 5 SW-only + 5 dual * 2
+
+
+def test_parse_taxonomy_definitions_branches():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    for n in nodes:
+        assert n["branch"] in ("software", "hardware")
+
+
+def test_parse_taxonomy_definitions_paths_unique():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    paths = [n["path"] for n in nodes]
+    assert len(paths) == len(set(paths))
+
+
+def test_parse_taxonomy_definitions_parent_paths_valid():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    all_paths = {n["path"] for n in nodes}
+    for n in nodes:
+        if n["level"] > 2:
+            assert n["parent_path"] in all_paths, (
+                f"Node {n['path']} has parent_path {n['parent_path']} not in all_paths"
+            )
+
+
+def test_parse_taxonomy_definitions_dual_branch_groups():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    dual_slugs = {
+        "collaboration-communication",
+        "end-user-computing",
+        "security",
+        "it-operations-infrastructure",
+        "networking",
+    }
+    for slug in dual_slugs:
+        branches = {n["branch"] for n in nodes if n["governance_group_slug"] == slug}
+        assert branches == {"software", "hardware"}, (
+            f"Group {slug} has branches {branches}, expected both"
+        )
+
+
+def test_parse_taxonomy_definitions_ltree_valid_paths():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    for n in nodes:
+        for label in n["path"].split("."):
+            assert re.match(r"^[a-zA-Z0-9_]+$", label), (
+                f"Invalid ltree label '{label}' in path '{n['path']}'"
+            )
+
+
+def test_parse_taxonomy_definitions_has_definitions():
+    nodes = parse_taxonomy_definitions(RESEARCH_DOC)
+    for n in nodes:
+        assert n["definition"], f"Node {n['path']} has empty definition"
