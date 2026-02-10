@@ -17,7 +17,7 @@ export default function TaxonomyPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const fetchNodes = search
+    const fetchNodes = search.length >= 2
       ? api.taxonomy.searchNodes(search)
       : api.taxonomy.listNodes({ branch });
     fetchNodes
@@ -64,6 +64,7 @@ export default function TaxonomyPage() {
               nodes={nodes}
               selectedId={selectedNode?.id ?? null}
               onSelect={handleSelect}
+              isSearching={search.length >= 2}
             />
           )}
         </ScrollArea>

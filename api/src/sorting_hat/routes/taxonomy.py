@@ -97,7 +97,7 @@ async def list_nodes(
 
 @router.get("/nodes/search", response_model=list[TaxonomyNodeResponse])
 async def search_nodes(
-    q: str = Query(..., min_length=1, description="Text to search for in node names and definitions"),
+    q: str = Query(..., min_length=2, description="Text to search for in node names and definitions"),
     service: TaxonomyService = Depends(get_service),
 ):
     """Search taxonomy nodes by name or definition text."""

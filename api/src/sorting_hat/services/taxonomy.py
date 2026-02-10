@@ -193,4 +193,28 @@ class TaxonomyService:
             .order_by(TaxonomyNode.path)
             .limit(50)
         )
-        return list(result.scalars().all())
+        matches = list(result.scalars().all())
+
+        # Collect all ancestor IDs needed to build complete tree paths
+        seen_ids = {n.id for n in matches}
+        missing_parent_ids = {
+            n.parent_id for n in matches if n.parent_id and n.parent_id not in seen_ids
+        }
+
+        ancestors: list[TaxonomyNode] = []
+        while missing_parent_ids:
+            result = await self.session.execute(
+                select(TaxonomyNode).where(TaxonomyNode.id.in_(missing_parent_ids))
+            )
+            batch = list(result.scalars().all())
+            if not batch:
+                break
+            ancestors.extend(batch)
+            seen_ids.update(n.id for n in batch)
+            missing_parent_ids = {
+                n.parent_id for n in batch if n.parent_id and n.parent_id not in seen_ids
+            }
+
+        # Return ancestors first (sorted by path), then matches (sorted by path)
+        ancestors.sort(key=lambda n: n.path)
+        return ancestors + matches

@@ -9,10 +9,11 @@ interface TreeNodeProps {
   childrenMap: Map<string | null, TaxonomyNode[]>;
   selectedId: string | null;
   onSelect: (node: TaxonomyNode) => void;
+  defaultExpanded: boolean;
 }
 
-function TreeNode({ node, childrenMap, selectedId, onSelect }: TreeNodeProps) {
-  const [expanded, setExpanded] = useState(node.level <= 2);
+function TreeNode({ node, childrenMap, selectedId, onSelect, defaultExpanded }: TreeNodeProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
   const children = childrenMap.get(node.id) || [];
   const hasChildren = children.length > 0;
 
@@ -45,6 +46,7 @@ function TreeNode({ node, childrenMap, selectedId, onSelect }: TreeNodeProps) {
             childrenMap={childrenMap}
             selectedId={selectedId}
             onSelect={onSelect}
+            defaultExpanded={defaultExpanded}
           />
         ))}
     </div>
@@ -55,9 +57,10 @@ interface TaxonomyTreeProps {
   nodes: TaxonomyNode[];
   selectedId: string | null;
   onSelect: (node: TaxonomyNode) => void;
+  isSearching?: boolean;
 }
 
-export function TaxonomyTree({ nodes, selectedId, onSelect }: TaxonomyTreeProps) {
+export function TaxonomyTree({ nodes, selectedId, onSelect, isSearching = false }: TaxonomyTreeProps) {
   const childrenMap = new Map<string | null, TaxonomyNode[]>();
   for (const node of nodes) {
     const parentId = node.parent_id;
@@ -76,6 +79,7 @@ export function TaxonomyTree({ nodes, selectedId, onSelect }: TaxonomyTreeProps)
           childrenMap={childrenMap}
           selectedId={selectedId}
           onSelect={onSelect}
+          defaultExpanded={isSearching ? true : node.level <= 2}
         />
       ))}
     </div>
