@@ -52,6 +52,7 @@ export interface ClassificationResult {
   primary_node_id: string | null;
   primary_node_path: string | null;
   secondary_node_ids: string[];
+  secondary_node_paths: string[];
   confidence_score: number | null;
   model_used: string;
   reasoning: string;

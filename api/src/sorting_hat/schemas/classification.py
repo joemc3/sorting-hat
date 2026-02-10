@@ -29,6 +29,7 @@ class ClassificationResponse(BaseModel):
     primary_node_id: str | None
     primary_node_path: str | None = None
     secondary_node_ids: list[str]
+    secondary_node_paths: list[str] = []
     confidence_score: float | None
     model_used: str
     reasoning: str

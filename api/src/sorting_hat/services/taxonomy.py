@@ -172,6 +172,15 @@ class TaxonomyService:
                 chain.insert(0, node)
         return chain
 
+    async def resolve_node_path(self, node_id: str) -> str | None:
+        """Build a human-readable path like 'Software > Content & Media > Media Production'."""
+        node = await self.get_node(node_id)
+        if not node:
+            return None
+        chain = await self.get_parent_chain(node_id)
+        names = [n.name for n in chain] + [node.name]
+        return " > ".join(names)
+
     async def search_nodes(self, query: str) -> list[TaxonomyNode]:
         pattern = f"%{query}%"
         result = await self.session.execute(

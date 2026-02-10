@@ -13,8 +13,31 @@ from sorting_hat.schemas.classification import (
     ClassifyRequest,
 )
 from sorting_hat.services.classifier import ClassifierService, ClassificationError
+from sorting_hat.services.taxonomy import TaxonomyService
 
 router = APIRouter(prefix="/classify", tags=["classification"])
+
+
+async def _resolve_node_paths(
+    classification: Classification, session: AsyncSession
+) -> ClassificationResponse:
+    """Build a response dict with human-readable node paths resolved."""
+    taxonomy = TaxonomyService(session)
+    response = ClassificationResponse.model_validate(classification)
+
+    if classification.primary_node_id:
+        response.primary_node_path = await taxonomy.resolve_node_path(
+            classification.primary_node_id
+        )
+
+    paths = []
+    for node_id in classification.secondary_node_ids:
+        path = await taxonomy.resolve_node_path(node_id)
+        if path:
+            paths.append(path)
+    response.secondary_node_paths = paths
+
+    return response
 
 
 def get_llm_provider() -> OpenAICompatProvider:
@@ -39,7 +62,7 @@ async def classify_url(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Classification failed: {e}")
     await session.commit()
-    return result.classification
+    return await _resolve_node_paths(result.classification, session)
 
 
 @router.get("/{classification_id}", response_model=ClassificationDetail)
@@ -54,7 +77,20 @@ async def get_classification(
     classification = result.scalar_one_or_none()
     if not classification:
         raise HTTPException(status_code=404, detail="Classification not found")
-    return classification
+
+    taxonomy = TaxonomyService(session)
+    response = ClassificationDetail.model_validate(classification)
+    if classification.primary_node_id:
+        response.primary_node_path = await taxonomy.resolve_node_path(
+            classification.primary_node_id
+        )
+    paths = []
+    for node_id in classification.secondary_node_ids:
+        path = await taxonomy.resolve_node_path(node_id)
+        if path:
+            paths.append(path)
+    response.secondary_node_paths = paths
+    return response
 
 
 @router.get("", response_model=list[ClassificationResponse])
@@ -69,4 +105,5 @@ async def list_classifications(
         query = query.where(Classification.url.ilike(f"%{url}%"))
     query = query.limit(limit).offset(offset)
     result = await session.execute(query)
-    return list(result.scalars().all())
+    classifications = list(result.scalars().all())
+    return [await _resolve_node_paths(c, session) for c in classifications]
