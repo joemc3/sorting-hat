@@ -56,7 +56,7 @@ class ClassificationStep(Base):
     classification_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), ForeignKey("classifications.id"), nullable=False
     )
-    step_type: Mapped[StepType] = mapped_column(Enum(StepType), nullable=False)
+    step_type: Mapped[StepType] = mapped_column(Enum(StepType, name="step_type"), nullable=False)
     input_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     output_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     model_used: Mapped[str] = mapped_column(String(200), nullable=False, default="")
