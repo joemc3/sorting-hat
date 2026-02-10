@@ -20,6 +20,27 @@ def escape_sql(text: str) -> str:
     return text.replace("'", "''")
 
 
+GROUP_NUMBER_TO_SLUG: dict[int, str] = {
+    1: "application-development-platform",
+    2: "business-operations",
+    3: "customer-revenue-technology",
+    4: "data-analytics",
+    5: "collaboration-communication",
+    6: "end-user-computing",
+    7: "security",
+    8: "it-operations-infrastructure",
+    9: "engineering-design",
+    10: "networking",
+}
+
+DUAL_BRANCH_GROUPS: set[str] = {
+    "collaboration-communication",
+    "end-user-computing",
+    "security",
+    "it-operations-infrastructure",
+    "networking",
+}
+
 GOVERNANCE_GROUPS = [
     {
         "name": "Application Development & Platform",
