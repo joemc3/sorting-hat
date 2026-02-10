@@ -53,6 +53,11 @@ async def classify_url(
     session: AsyncSession = Depends(get_session),
     provider: OpenAICompatProvider = Depends(get_llm_provider),
 ):
+    """Classify a product by its URL.
+
+    Fetches the webpage, uses AI to summarize the product, then classifies it
+    into exactly one primary taxonomy node and up to two secondary nodes.
+    """
     model = data.model or settings.llm_model
     service = ClassifierService(session=session, llm=provider, model=model)
     try:
@@ -69,6 +74,7 @@ async def classify_url(
 async def get_classification(
     classification_id: str, session: AsyncSession = Depends(get_session)
 ):
+    """Get a classification by ID, including the raw page content and all intermediate AI steps."""
     result = await session.execute(
         select(Classification)
         .where(Classification.id == classification_id)
@@ -95,11 +101,12 @@ async def get_classification(
 
 @router.get("", response_model=list[ClassificationResponse])
 async def list_classifications(
-    url: str | None = None,
-    limit: int = Query(20, le=100),
-    offset: int = Query(0, ge=0),
+    url: str | None = Query(None, description="Filter by URL substring (case-insensitive)"),
+    limit: int = Query(20, le=100, description="Maximum number of results to return"),
+    offset: int = Query(0, ge=0, description="Number of results to skip for pagination"),
     session: AsyncSession = Depends(get_session),
 ):
+    """List classifications, newest first. Optionally filter by product URL."""
     query = select(Classification).order_by(Classification.created_at.desc())
     if url:
         query = query.where(Classification.url.ilike(f"%{url}%"))
