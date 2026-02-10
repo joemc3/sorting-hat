@@ -136,7 +136,7 @@ For additional Docker+UFW hardening, see: https://github.com/chaifeng/ufw-docker
 
 ## Updating
 
-CI/CD handles deployments automatically on push to `main`. For manual updates:
+CI builds and pushes new Docker images to GHCR on every push to `main`. To update the VPS:
 
 ```bash
 cd ~/sorting-hat
