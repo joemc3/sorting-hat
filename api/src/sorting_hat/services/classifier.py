@@ -38,6 +38,7 @@ class ClassifierService:
     async def classify_url(self, url: str) -> ClassificationResult:
         classification = Classification(url=url)
         self.session.add(classification)
+        await self.session.flush()
         steps = []
 
         # Step 1: Scrape
